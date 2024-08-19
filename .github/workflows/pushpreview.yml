@@ -1,0 +1,39 @@
+name: PushPreview
+
+on:
+  pull_request_target:
+    types:
+      - labeled
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'preview'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}  # Checkout the branch associated with the PR
+      - name: Comment
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "⚙️ Hang tight! PushPreview is currently building your preview. We'll share the URL as soon as it's ready."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set BASE_URL
+        run: echo "BASE_URL=/github/${{ github.repository }}/${{ github.event.number }}/" >> $GITHUB_ENV
+
+      - name: Build site
+        run: |
+          npm ci
+          npm run build
+
+      - name: Generate preview
+        uses: PushLabsHQ/pushpreview-action@1.0.6
+        with:
+          source-directory: ./build
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pushpreview-token: ${{ secrets.PUSHPREVIEW_TOKEN }}
